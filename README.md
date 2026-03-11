@@ -56,6 +56,23 @@ python3 ai-news-monitor/scripts/fetch_news.py
 
 ---
 
+### 5. 8d-report
+芯片 Fabless 公司客户问题 8D 报告生成工具
+
+**功能：**
+- 生成标准 8D 报告（D0-D8）
+- 交互式问答填写
+- 包含 5Why 分析、鱼骨图模板
+- 适用于芯片 fabless 公司客户投诉处理
+
+**使用：**
+```bash
+python3 8d-report/scripts/generate_8d.py
+# 交互式填写问题信息，自动生成完整 8D 报告
+```
+
+---
+
 ## 配置
 
 - Tavily API Key：需自行配置
