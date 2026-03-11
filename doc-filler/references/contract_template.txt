@@ -1,0 +1,37 @@
+# Service Agreement Contract
+
+This Service Agreement ("Agreement") is entered into as of {{start_date}} by and between:
+
+**Service Provider:**
+Name: {{provider_name}}
+Address: {{provider_address}}
+Email: {{provider_email}}
+
+**Client:**
+Name: {{client_name}}
+Address: {{client_address}}
+Email: {{client_email}}
+
+## Services
+
+The Service Provider agrees to provide the following services:
+{{service_description}}
+
+## Payment Terms
+
+Service Fee: {{payment_amount}}
+Payment Method: {{payment_method}}
+Due Date: {{due_date}}
+
+## Term
+
+This Agreement shall commence on {{start_date}} and continue until {{end_date}}.
+
+## Signatures
+
+Service Provider: _____________________ Date: {{signature_date_provider}}
+Client: _____________________ Date: {{signature_date_client}}
+
+## Notes
+
+Additional terms: {{additional_notes}}

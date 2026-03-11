@@ -1,0 +1,10 @@
+{
+  "provider_name": "Tech Solutions Inc.",
+  "provider_email": "contact@techsolutions.com",
+  "client_name": "ABC Corporation",
+  "client_email": "procurement@abccorp.com",
+  "service_description": "Cloud infrastructure setup and maintenance",
+  "payment_amount": "$5,000 USD",
+  "payment_method": "Bank Transfer",
+  "start_date": "2026-04-01"
+}
