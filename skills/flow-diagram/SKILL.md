@@ -78,7 +78,59 @@ mmdc -i input.mmd -o output.png
 mmdc -i input.mmd -o output.svg
 ```
 
-## 常用 Mermaid 语法
+## 配色方案（让流程图更美观）
+
+### 基础配置（推荐使用）
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 
+  'background': '#ffffff',
+  'primaryColor': '#e3f2fd',
+  'lineColor': '#333333',
+  'fontFamily': 'Microsoft YaHei, sans-serif'
+}}}%%
+```
+
+### 节点颜色分类
+
+| 类型 | 颜色代码 | 用途 |
+|------|----------|------|
+| 开始/结束 | `#ff7043` | 起点和终点节点 |
+| 准备阶段 | `#fff9c4` | 准备类节点 |
+| 执行阶段 | `#ffcc80` | 加工、处理节点 |
+| 关键操作 | `#ef5350` | 重要步骤 |
+| 完成/成功 | `#66bb6a` | 成功、完成状态 |
+
+### 配色代码参考
+
+**暖色调：**
+- 红色系: `#ef5350`, `#e53935`, `#d32f2f`
+- 橙色系: `#ff7043`, `#ff9800`, `#f57c00`
+- 黄色系: `#fff9c4`, `#ffeb3b`, `#fbc02d`
+
+**冷色调：**
+- 蓝色系: `#e3f2fd`, `#90caf9`, `#42a5f5`
+- 绿色系: `#e8f5e9`, `#66bb6a`, `#43a047`
+- 紫色系: `#f3e5f5`, `#ce93d8`, `#ab47bc`
+
+### 节点样式示例
+
+```mermaid
+%%{init: {'theme': 'base'}}}%%
+graph TD
+    A((开始)) --> B[处理]
+    B --> C{判断}
+    C -->|是| D[结果1]
+    C -->|否| E[结果2]
+    D --> F((完成))
+    
+    style A fill:#ff7043,color:#fff,stroke:#e64a19
+    style B fill:#e3f2fd,color:#1565c0,stroke:#90caf9
+    style C fill:#fff9c4,color:#333,stroke:#fbc02d
+    style D fill:#66bb6a,color:#fff,stroke:#388e3c
+    style E fill:#ef5350,color:#fff,stroke:#d32f2f
+    style F fill:#26a69a,color:#fff,stroke:#00897b
+```
 
 ### 流程图
 
