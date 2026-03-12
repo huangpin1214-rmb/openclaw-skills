@@ -1,223 +1,278 @@
 #!/usr/bin/env python3
 """
-BIS ECCN 分类分析工具
-帮助收集信息并生成初步分析
+BIS ECCN 分析工具
+帮助分析芯片产品的出口管制分类
 """
 
-import json
 import sys
+import json
 
-def analyze_3a090_risk(data):
-    """分析 3A090 风险"""
-    risk_score = 0
-    factors = []
+def analyze_3a090(product_info):
+    """分析 3A090 先进计算控制"""
+    risks = []
+    excludes = []
     
-    # 制程节点
-    node = data.get('process_node', '').lower()
-    if '16nm' in node or '14nm' in node or '10nm' in node or '7nm' in node or '5nm' in node:
-        risk_score += 3
-        factors.append(f"先进制程节点: {node}")
+    # 检查制程节点
+    node = product_info.get('process_node', '').lower()
+    if '16' in node or '14' in node or '10' in node or '7' in node or '5' in node:
+        risks.append("制程节点 ≤16nm，可能触发 3A090")
+    elif node:
+        excludes.append(f"制程节点 {node} 不在先进节点范围")
     
-    # 数字处理单元
-    if data.get('has_digital_processing', False):
-        risk_score += 3
-        factors.append("包含数字处理单元")
+    # 检查计算单元
+    compute_units = product_info.get('compute_units', [])
+    if any(u in compute_units for u in ['cpu', 'gpu', 'npu', 'dsp', 'fpga', 'accelerator']):
+        risks.append("包含数字处理单元 (CPU/GPU/NPU/FPGA)")
+    elif compute_units and 'none' not in compute_units:
+        risks.append("包含计算单元")
+    else:
+        excludes.append("无数字处理单元")
     
-    # 计算功能
-    compute_funcs = data.get('compute_functions', [])
-    high_risk_funcs = ['mac', 'vector', 'tensor', 'ai', 'inference', 'training', 'gpu', 'npu']
-    for func in compute_funcs:
-        if any(h in func.lower() for h in high_risk_funcs):
-            risk_score += 2
-            factors.append(f"高风险计算功能: {func}")
+    # 检查 AI/ML 功能
+    ai_functions = product_info.get('ai_functions', [])
+    if any(f in ai_functions for f in ['mac', 'vector', 'tensor', 'inference', 'training', 'ai']):
+        risks.append("具有 AI/ML 相关功能 (MAC/向量/张量/推理)")
     
-    # HBM 支持
-    if data.get('has_hbm', False):
-        risk_score += 3
-        factors.append("支持 HBM")
+    # 检查 HBM
+    if product_info.get('hbm', False):
+        risks.append("支持 HBM，高带宽内存")
+    else:
+        excludes.append("不支持 HBM")
     
-    # Chiplet/共封装
-    if data.get('has_chiplet', False):
-        risk_score += 2
-        factors.append("支持 Chiplet/共封装")
+    # 检查 Chiplet
+    if product_info.get('chiplet', False) or product_info.get('copackaged', False):
+        risks.append("支持 Chiplet/共封装集成")
     
-    # 数据中心定位
-    datacenter = data.get('datacenter_marketing', False)
+    # 检查数据中心定位
+    datacenter = product_info.get('datacenter', False)
     if datacenter:
-        risk_score += 3
-        factors.append("数据中心/服务器营销")
+        risks.append("定位数据中心/服务器使用")
+    else:
+        excludes.append("非数据中心定位")
     
-    # AI/HPC 定位
-    ai_marketing = data.get('ai_marketing', False)
+    # 检查 AI 营销
+    ai_marketing = product_info.get('ai_marketing', False)
     if ai_marketing:
-        risk_score += 3
-        factors.append("AI/HPC 营销定位")
+        risks.append("营销中包含 AI/HPC/服务器加速相关描述")
     
-    return risk_score, factors
+    # 判断：风险因素多于排除因素时才是 likely
+    recommendation = 'unlikely_3a090'
+    if len(risks) > len(excludes) and len(risks) > 0:
+        recommendation = 'likely_3a090'
+    elif len(risks) > 0:
+        recommendation = 'possible_3a090'
+    
+    return {
+        'risks': risks,
+        'excludes': excludes,
+        'recommendation': recommendation
+    }
 
-def analyze_5a002_risk(data):
-    """分析 5A002 加密风险"""
-    risk_score = 0
-    factors = []
+def analyze_5a002(product_info):
+    """分析 5A002 加密控制"""
+    risks = []
+    excludes = []
     
-    if data.get('has_encryption', False):
-        risk_score += 4
-        factors.append("包含加密功能")
-        
-        if data.get('encryption_user_accessible', False):
-            risk_score += 2
-            factors.append("用户可访问加密")
-        
-        if data.get('has_secure_boot', False):
-            risk_score += 1
-            factors.append("安全启动功能")
-        
-        if data.get('has_key_management', False):
-            risk_score += 1
-            factors.append("密钥管理功能")
+    # 检查加密功能
+    if product_info.get('encryption', False):
+        enc_type = product_info.get('encryption_type', '')
+        if enc_type in ['user_accessible', 'hardware', 'secure_boot', 'key_management']:
+            risks.append(f"具有用户可访问加密功能: {enc_type}")
+        else:
+            risks.append("具有加密功能，需进一步评估")
+    else:
+        excludes.append("无加密功能")
     
-    return risk_score, factors
+    # 检查安全功能
+    security = product_info.get('security_features', [])
+    if any(s in security for s in ['secure_boot', 'tamper', '物理安全']):
+        risks.append("具有安全功能")
+    
+    return {
+        'risks': risks,
+        'excludes': excludes,
+        'recommendation': 'likely_5a002' if risks else 'unlikely_5a002'
+    }
 
-def generate_preliminary_view(data):
+def analyze_3a001(product_info):
+    """分析 3A001 特定集成电路"""
+    # 3A001 包含多种特定类型的集成电路
+    # 需要具体性能参数才能评估
+    return {
+        'risks': ['如满足特定性能参数可能受控'],
+        'excludes': [],
+        'recommendation': 'need_more_info'
+    }
+
+def analyze_ear99(product_info):
+    """分析 EAR99"""
+    # EAR99 是最不严格的分类
+    
+    # 排除其他 ECCN 后可以考虑 EAR99
+    return {
+        'criteria_met': [],
+        'criteria_not_met': [],
+        'recommendation': 'possible_ear99'
+    }
+
+def generate_classification_view(product_info):
     """生成初步分类观点"""
-    results = {}
     
-    # 3A090 分析
-    score_3a090, factors_3a090 = analyze_3a090_risk(data)
-    results['3A090'] = {
-        'score': score_3a090,
-        'factors': factors_3a090,
-        'risk_level': '高' if score_3a090 >= 8 else ('中' if score_3a090 >= 4 else '低')
+    results = {
+        '3a090': analyze_3a090(product_info),
+        '5a002': analyze_5a002(product_info),
+        '3a001': analyze_3a001(product_info),
+        'ear99': analyze_ear99(product_info)
     }
     
-    # 5A002 分析
-    score_5a002, factors_5a002 = analyze_5a002_risk(data)
-    results['5A002'] = {
-        'score': score_5a002,
-        'factors': factors_5a002,
-        'risk_level': '高' if score_5a002 >= 5 else ('中' if score_5a002 >= 2 else '低')
+    # 总结
+    summary = {
+        'likely_eccn': [],
+        'possible_eccn': [],
+        'unlikely_eccn': [],
+        'confidence': 'low'
     }
-    
-    return results
-
-def print_analysis(data):
-    """打印分析结果"""
-    print("\n" + "="*60)
-    print("🔍 BIS ECCN 初步分析")
-    print("="*60)
-    
-    print(f"\n📋 产品: {data.get('product_name', 'N/A')} ({data.get('part_number', 'N/A')})")
-    print(f"🔧 功能: {data.get('main_function', 'N/A')}")
-    print(f"📊 制程: {data.get('process_node', 'N/A')}")
-    print(f"🏢 定位: {data.get('market_positioning', 'N/A')}")
-    
-    results = generate_preliminary_view(data)
-    
-    print("\n" + "-"*60)
-    print("📈 风险评估")
-    print("-"*60)
     
     for eccn, result in results.items():
-        print(f"\n【{eccn}】 风险等级: {result['risk_level']} (得分: {result['score']})")
-        if result['factors']:
-            for f in result['factors']:
-                print(f"  • {f}")
+        rec = result.get('recommendation', '')
+        if 'likely' in rec and 'unlikely' not in rec:
+            summary['likely_eccn'].append(eccn.upper())
+        elif 'possible' in rec:
+            summary['possible_eccn'].append(eccn.upper())
         else:
-            print("  ✓ 未发现风险因素")
+            summary['unlikely_eccn'].append(eccn.upper())
     
-    # CCATS 建议
-    total_risk = results['3A090']['score'] + results['5A002']['score']
+    # 计算置信度
+    if len(summary['likely_eccn']) >= 2:
+        summary['confidence'] = 'high'
+    elif summary['possible_eccn']:
+        summary['confidence'] = 'medium'
     
-    print("\n" + "-"*60)
-    print("📝 CCATS 申请建议")
-    print("-"*60)
-    
-    if total_risk >= 10:
-        print("⚠️  建议申请 CCATS - 高风险分类需要 BIs 确认")
-    elif total_risk >= 5:
-        print("🔸 建议深入分析 - 建议收集更多证据后决定")
-    else:
-        print("✓ 风险较低 - 可考虑 EAR99 或 3A991")
-    
-    print("\n" + "="*60)
-    print("⚠️  注意：此分析仅供参考，不构成法律建议")
-    print("="*60 + "\n")
+    return results, summary
 
-def interactive_mode():
-    """交互式问答模式"""
-    print("\n🖥️  BIS ECCN 分类分析 - 交互模式")
-    print("请回答以下问题（直接回车跳过）\n")
+def generate_missing_info_list(product_info):
+    """生成缺失信息清单"""
+    required = [
+        ('product_name', '产品名称'),
+        ('part_number', '型号/料号'),
+        ('primary_function', '主要功能'),
+        ('process_node', '制程节点'),
+        ('package_type', '封装类型'),
+        ('compute_units', '计算单元'),
+        ('hbm', 'HBM 支持'),
+        ('chiplet', 'Chiplet 支持'),
+        ('encryption', '加密功能'),
+        ('datacenter', '数据中心定位'),
+    ]
     
-    data = {}
+    missing = []
+    for field, name in required:
+        if not product_info.get(field):
+            missing.append(name)
     
-    data['product_name'] = input("产品名称: ").strip() or "N/A"
-    data['part_number'] = input("型号/料号: ").strip() or "N/A"
-    data['main_function'] = input("主要功能: ").strip() or "N/A"
-    
-    print("\n--- 技术规格 ---")
-    data['process_node'] = input("制程节点 (如 7nm, 14nm): ").strip() or "未知"
-    
-    has_cpu = input("是否包含 CPU/GPU/NPU/DSP/FPGA? (y/n): ").strip().lower() == 'y'
-    data['has_digital_processing'] = has_cpu
-    
-    compute_funcs = input("计算功能 (MAC/向量/张量/AI推理等，逗号分隔): ").strip()
-    data['compute_functions'] = [f.strip() for f in compute_funcs.split(',')] if compute_funcs else []
-    
-    data['has_hbm'] = input("是否支持 HBM? (y/n): ").strip().lower() == 'y'
-    data['has_chiplet'] = input("是否支持 Chiplet/共封装? (y/n): ").strip().lower() == 'y'
-    
-    print("\n--- 市场定位 ---")
-    data['datacenter_marketing'] = input("是否定位数据中心/服务器? (y/n): ").strip().lower() == 'y'
-    data['ai_marketing'] = input("是否定位 AI/HPC? (y/n): ").strip().lower() == 'y'
-    data['market_positioning'] = "数据中心/AI" if data['datacenter_marketing'] or data['ai_marketing'] else "其他"
-    
-    print("\n--- 加密/安全 ---")
-    data['has_encryption'] = input("是否包含加密功能? (y/n): ").strip().lower() == 'y'
-    if data['has_encryption']:
-        data['encryption_user_accessible'] = input("用户可访问加密? (y/n): ").strip().lower() == 'y'
-        data['has_secure_boot'] = input("有安全启动? (y/n): ").strip().lower() == 'y'
-        data['has_key_management'] = input("有密钥管理? (y/n): ").strip().lower() == 'y'
-    
-    print_analysis(data)
+    return missing
 
 def main():
-    if len(sys.argv) == 1:
-        interactive_mode()
-    elif sys.argv[1] == '--help':
+    if len(sys.argv) < 2:
         print("""
-BIS ECCN 分类分析工具
+🔍 BIS ECCN 分析工具
 
 用法:
-  python3 analyze.py              # 交互模式
-  python3 analyze.py --interactive  # 交互模式
-  python3 analyze.py --sample       # 使用示例数据
+  python3 analyze.py --part-number <型号> --function <功能> --node <节点> --compute <计算单元> --hbm <y/n> --datacenter <y/n> --encryption <y/n>
 
-或直接传入 JSON 数据:
-  python3 analyze.py '{"process_node": "7nm", "has_digital_processing": true}'
+参数:
+  --part-number       产品型号
+  --function         主要功能 (compute/interface/power/control/other)
+  --node             制程节点 (如 14nm, 28nm, 7nm)
+  --compute          是否包含计算单元 (cpu/gpu/npu/dsp/fpga/none)
+  --hbm              是否支持 HBM (y/n)
+  --chiplet          是否支持 Chiplet (y/n)
+  --datacenter       是否定位数据中心 (y/n)
+  --ai-marketing     是否有 AI 营销 (y/n)
+  --encryption       是否有加密功能 (y/n)
+
+示例:
+  python3 analyze.py --function interface --node 28nm --compute none --hbm n --datacenter n --encryption n
         """)
-    elif sys.argv[1] == '--sample':
-        sample_data = {
-            'product_name': '示例芯片',
-            'part_number': 'SAMPLE-001',
-            'main_function': '网络接口控制器',
-            'process_node': '7nm',
-            'has_digital_processing': True,
-            'compute_functions': ['packet processing'],
-            'has_hbm': False,
-            'has_chiplet': False,
-            'datacenter_marketing': True,
-            'ai_marketing': False,
-            'market_positioning': '数据中心',
-            'has_encryption': False
-        }
-        print_analysis(sample_data)
+        return
+    
+    # 解析参数
+    args = {}
+    i = 1
+    while i < len(sys.argv):
+        if sys.argv[i].startswith('--') and i + 1 < len(sys.argv):
+            key = sys.argv[i][2:]
+            value = sys.argv[i + 1]
+            args[key] = value
+            i += 2
+        else:
+            i += 1
+    
+    # 转换参数
+    product_info = {
+        'part_number': args.get('part-number', '未知'),
+        'primary_function': args.get('function', 'other'),
+        'process_node': args.get('node', ''),
+        'compute_units': args.get('compute', 'none').split(',') if args.get('compute') else [],
+        'hbm': args.get('hbm', 'n').lower() == 'y',
+        'chiplet': args.get('chiplet', 'n').lower() == 'y',
+        'copackaged': args.get('chiplet', 'n').lower() == 'y',
+        'datacenter': args.get('datacenter', 'n').lower() == 'y',
+        'ai_marketing': args.get('ai-marketing', 'n').lower() == 'y',
+        'encryption': args.get('encryption', 'n').lower() == 'y',
+    }
+    
+    print(f"\n📋 产品: {product_info['part_number']}")
+    print(f"   功能: {product_info['primary_function']}")
+    print(f"   节点: {product_info['process_node']}")
+    print(f"   计算单元: {product_info['compute_units']}")
+    print(f"   HBM: {product_info['hbm']}")
+    print(f"   数据中心: {product_info['datacenter']}")
+    print(f"   加密: {product_info['encryption']}")
+    
+    # 分析
+    results, summary = generate_classification_view(product_info)
+    missing = generate_missing_info_list(product_info)
+    
+    print(f"\n{'='*50}")
+    print("📊 ECCN 分析结果")
+    print(f"{'='*50}")
+    
+    for eccn, result in results.items():
+        print(f"\n### {eccn.upper()}")
+        if result.get('risks'):
+            print("  ⚠️  风险因素:")
+            for r in result['risks']:
+                print(f"     - {r}")
+        if result.get('excludes'):
+            print("  ✅ 排除因素:")
+            for e in result['excludes']:
+                print(f"     - {e}")
+    
+    print(f"\n{'='*50}")
+    print("📈 分类总结")
+    print(f"{'='*50}")
+    print(f"  可能 ECCN: {', '.join(summary['likely_eccn']) or '无'}")
+    print(f"  待确认: {', '.join(summary['possible_eccn']) or '无'}")
+    print(f"  不太可能: {', '.join(summary['unlikely_eccn']) or '无'}")
+    print(f"  置信度: {summary['confidence']}")
+    
+    if missing:
+        print(f"\n⚠️  缺失信息:")
+        for m in missing:
+            print(f"     - {m}")
+    
+    # CCATS 建议
+    print(f"\n{'='*50}")
+    print("💡 CCATS 申请建议")
+    print(f"{'='*50}")
+    
+    if '3a090' in summary['likely_eccn'] or '5a002' in summary['likely_eccn']:
+        print("  建议：考虑申请 CCATS 以获得官方分类确认")
+    elif summary['confidence'] == 'low':
+        print("  建议：收集更多技术信息后再评估")
     else:
-        # 尝试解析 JSON
-        try:
-            data = json.loads(sys.argv[1])
-            print_analysis(data)
-        except json.JSONDecodeError:
-            print("❌ JSON 解析错误")
+        print("  建议：可能适用 EAR99，但建议咨询专业律师")
 
 if __name__ == "__main__":
     main()
