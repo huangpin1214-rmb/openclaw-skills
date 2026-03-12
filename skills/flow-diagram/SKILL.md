@@ -215,9 +215,44 @@ graph TB
 
 ## 在线预览工具
 
-- Mermaid Live: https://mermaid.live/
-- Draw.io: https://draw.io
+- Mermaid Live: https://mermaid.live/ (可导出 PNG/SVG/PDF)
+- Draw.io: https://draw.io (可导出 PDF/PPT)
 - PlantUML: https://plantuml.com
+
+## 导出 PDF/PPT 方法
+
+### 方法 1：Mermaid Live（推荐）
+
+1. 打开 https://mermaid.live/
+2. 粘贴 Mermaid 代码
+3. 点击导出 → 选择格式（PNG/SVG/PDF）
+
+### 方法 2：Draw.io
+
+1. 打开 https://draw.io/
+2. 选择 "Presentation" 模式
+3. 手动创建或导入图表
+4. 文件 → 导出 → PDF/PPT
+
+### 方法 3：本地命令行（需要安装）
+
+```bash
+# 安装 Node.js 后
+npm install -g @mermaid-js/mermaid-cli
+
+# 生成 PNG
+mmdc -i diagram.mmd -o diagram.png
+
+# 生成 SVG
+mmdc -i diagram.mmd -o diagram.svg
+```
+
+### 方法 4：Python 脚本生成 PPT
+
+需要安装 python-pptx：
+```bash
+pip install python-pptx
+```
 
 ## 技巧
 
