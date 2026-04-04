@@ -1,125 +1,129 @@
 ---
 name: bis-entity-check
-description: 查询美国 BIS EAR 实体清单。详细版：包含具体实体名称、脚注编号、列入时间、列入原因。
+description: |
+  查询美国 BIS EAR 实体清单，判断公司/供应商是否在出口管制实体清单上。
+  
+  触发词：
+  - "查一下 XX 公司在实体清单上吗？"
+  - "这个供应商在实体清单上吗"
+  - "XX 是 BIS 实体吗"
+  - "帮我查一下这个公司的 BIS 状态"
+  - "供应商 BIS 检查"
+  
+  支持任意公司查询（不仅限于内置数据库），自动判断合规流程触发建议。
+  查询结果自动记录到飞书 Bitable 用于追溯。
 ---
 
-# BIS Entity Check
+# BIS Entity Check - BIS 实体清单查询
 
-查询公司是否在美国 BIS（ Bureau of Industry and Security）实体清单上。
+## 核心功能
 
-## 📚 BIS官网（定期学习）
-- **官网**: https://www.bis.gov/
-- **Federal Register**: https://www.bis.gov/regulations/federal-register-notices
-- **Entity List**: https://www.bis.gov/regulations/ear/part-764/section-764.1/introduction
+| 功能 | 说明 |
+|------|------|
+| **动态查询** | 支持任意公司名称，不限于内置数据库 |
+| **完整信息** | 列入状态 + 时间 + 原因 + 脚注 + 子公司关系 |
+| **合规判断** | 自动判断是否需要触发合规审查流程 |
+| **飞书记录** | 查询结果自动写入飞书 Bitable 备查追溯 |
 
-**定期检查**: 每周一BIS EAR周报任务会自动检查更新
-
-## 功能
-
-- ✅ 显示所有具体实体名称（区分母公司/子公司）
-- ✅ 显示脚注编号（如 Footnote 4）
-- ✅ 显示列入时间
-- ✅ 显示列入原因
-- ✅ 当日缓存，避免重复调用
-
-## 使用方式
-
-### 运行脚本
-
-```bash
-# 查询默认公司（浪潮、新华三、合肥长鑫等）
-python3 ~/.openclaw/workspace/skills/bis-entity-check/scripts/check_bis.py
-
-# 查询特定公司
-python3 ~/.openclaw/workspace/skills/bis-entity-check/scripts/check_bis.py 浪潮
-
-# 强制刷新缓存
-python3 ~/.openclaw/workspace/skills/bis-entity-check/scripts/check_bis.py --refresh
-```
-
-### 输出示例
+## 触发方式
 
 ```
-🔍 BIS 实体清单查询: 浪潮 (Inspur)
+用户: "查一下 XX 公司在实体清单上吗？"
+用户: "这个供应商在 BIS 清单上吗"
+用户: "帮我查一下这个公司的 BIS 状态"
+```
 
-⚠️ 状态: **已在实体清单上**
+## 查询结果展示
+
+当查询一家公司时，输出：
+
+```
+🔍 BIS 实体清单查询: [公司名]
+
+⚠️ 状态: 已在 BIS 实体清单上
+📌 合规建议: ⚠️ 强烈建议触发合规审查
 
 📋 具体实体:
-   1. Inspur (Beijing) Electronic Information Industry Co., Ltd.
-   2. Inspur Electronic Information Industry Co., Ltd.
-   3. Inspur Electronic Information (Hong Kong) Co., Ltd.
-   4. Inspur (HK) Electronics Co., Ltd.
-   5. Inspur Software Co., Ltd.
-   6. Inspur Taiwan (浪潮台湾子公司)
+   1. [实体名称1]
+   2. [实体名称2]
 
 📋 清单信息:
-   • 清单类型: EL (Entity List)
-   • 脚注: 4
-   • 列入时间: 2025年3月25/26日
-   • 列入原因: 支持中国军事现代化/超级计算机开发
+   • 脚注: 1, 3, 4
+   • 列入时间: YYYY年MM月
+   • 列入原因: [原因]
+   • 许可证政策: 推定拒绝/逐案审查
 ```
 
-## 当前支持查询的公司
+## 合规流程判断逻辑
 
-| 公司 | 状态 | 实体数量 | 列入时间 |
-|------|------|----------|----------|
-| 浪潮 (Inspur) | 已列入 | 6个实体 | 2025.3 |
-| 新华三 (H3C) | 部分列入 | 1个子公司 | 2024.12 |
-| 合肥长鑫 (CXMT) | 未列入 | - | - |
-| 中芯国际 (SMIC) | 已列入 | 1个 | 2020.12 |
-| 长江存储 (YMTC) | 已列入 | 1个 | 2022.12 |
-| 华为 | 已列入 | 多个 | 2019.5 |
+| 状态 | 脚注 | 判断结果 |
+|------|------|---------|
+| 已列入 | Footnote 1/3/4 | ⚠️ 触发合规审查（推定拒绝） |
+| 已列入 | 其他脚注 | ⚠️ 触发合规审查（逐案审查） |
+| 部分列入 | — | 🔶 触发合规审查（子公司已列入） |
+| 未列入 | — | ✅ 无需触发 |
 
-## 状态说明
+## 内置公司数据库
 
-| 状态 | 含义 |
-|------|------|
-| ⚠️ 已列入 | 公司主体已在 BIS 实体清单上 |
-| 🔶 部分列入 | 母公司未列入，但子公司已列入 |
-| ✅ 未列入 | 不在实体清单上 |
+以下公司有精确信息（无需联网）：
 
-## 脚注说明
+| 公司 | 状态 | 列入时间 | 脚注 |
+|------|------|---------|------|
+| 华为 | ⚠️ 已列入 | 2019年5月 | 1, 3, 4 |
+| 中芯国际 | ⚠️ 已列入 | 2020年12月 | 4 |
+| 长江存储 | ⚠️ 已列入 | 2022年12月 | 4 |
+| 新华三 | 🔶 部分列入 | 2024年12月 | - |
+| 浪潮 | ⚠️ 已列入 | 2025年3月 | 4 |
+| 合肥长鑫 | ✅ 未列入 | - | - |
+
+## 飞书记录
+
+每次查询结果会自动记录到飞书 Bitable：
+
+**表名**: BIS 实体清单查询记录
+**字段**: 查询公司、英文名、状态、具体实体、脚注、列入时间、列入原因、许可证政策、合规建议、查询时间、数据来源
+
+查看记录：向阿鲲发送"查一下 BIS 记录"或"给我看 BIS 查询历史"
+
+## 脚注含义
 
 | 脚注 | 含义 |
 |------|------|
-| Footnote 1 | 出口管理条例第 744.22 条规定的军事最终用户 |
-| Footnote 3 | 与被列入实体的关系导致 presumption of denial（推定拒绝） |
-| Footnote 4 | 涉及国家安全的实体，需要更严格审查 |
+| Footnote 1 | 军事最终用户（744.22条规定） |
+| Footnote 3 | 与被列入实体关系导致推定拒绝 |
+| Footnote 4 | 涉及国家安全的实体，需更严格审查 |
 
-## 许可证审查政策
+## 许可证政策
 
-| 政策 | 含义 | 典型时期 |
-|------|------|----------|
-| 推定拒绝 (Presumption of Denial) | 原则上拒绝 | 2022-2024 |
-| 逐案审查 (Case-by-Case) | 根据具体情况 | 2026起松动 |
-| 批准 (Approval) | 原则上批准 | 较少使用 |
+| 政策 | 含义 | 典型脚注 |
+|------|------|---------|
+| 推定拒绝 (Presumption of Denial) | 原则上拒绝，较难获批 | Footnote 1/3/4 |
+| 逐案审查 (Case-by-Case) | 根据具体情况审批 | 其他脚注 |
+| 正常审批 | 原则上批准 | 无脚注 |
 
-**注意**: 2026年起H200/MI325X等芯片从"推定拒绝"转为"逐案审查"
+## 运行脚本
 
-## ERC委员会
+```bash
+# 查询公司（支持任意名称）
+python3 skills/bis-entity-check/scripts/check_bis.py 华为
 
-- **全称**: End-User Review Committee
-- **成员**: 商务部(主席)、国防部、国务院、能源部、财政部
-- **决策**: 列入需多数票，移除需全票
+# 强制刷新缓存
+python3 skills/bis-entity-check/scripts/check_bis.py 华为 --refresh
 
-## 政策演变 (2018-2026)
-
+# 查询多个公司
+python3 skills/bis-entity-check/scripts/check_bis.py 华为 中芯国际 浪潮
 ```
-2018: ECRA生效
-2019: 华为被列入
-2022.10: 史上最严 - "推定拒绝"
-2024.12: 最大规模 - 140个新增
-2025.01: AI扩散框架
-2026.02: 局部松动 - "逐案审查"
-```
+
+## 数据来源
+
+| 来源 | 说明 |
+|------|------|
+| 内置数据库 | 精确信息（华为、中芯国际等6家公司） |
+| Tavily 搜索 | 动态查询未收录的公司（实时搜索 BIS 官网） |
+
+> ⚠️ 数据来源说明：内置数据库来自 BIS 官方 Federal Register 公开文件；动态查询来自 Tavily 搜索结果，非 BIS 官方文档。如需权威信息请访问 https://www.bis.gov/
 
 ## 知识库
 
-详细法规知识库请参考: `docs/BIS_Knowledge_Base.md`
-中国时间线: `docs/BIS_China_Timeline.md`
-
-## 注意事项
-
-- 信息基于 BIS 官方 Federal Register 公开文件
-- 建议访问 BIS 官网确认最新状态：https://www.bis.gov/
-- 支持查询更多公司，可后续扩展数据库
+- BIS 知识库: `docs/BIS_Knowledge_Base.md`
+- 中国时间线: `docs/BIS_China_Timeline.md`
