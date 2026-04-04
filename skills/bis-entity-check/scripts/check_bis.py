@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-BIS Entity List Checker v7 (bis-entity-check)
-使用 Tavily API 查询公司是否在 BIS 实体清单上
+BIS Entity List Checker v8
+使用 BIS 官方 Excel 数据（1069条中国实体）作为内置数据库
 支持任意公司查询，自动记录到飞书 Bitable，包含合规流程判断
 """
 
@@ -14,94 +14,26 @@ from datetime import datetime
 
 API_KEY = "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"
 CACHE_DIR = os.path.expanduser("~/.openclaw/workspace/skills/bis-entity-check/cache/")
+OFFICIAL_DB_FILE = os.path.join(CACHE_DIR, "bis_china_official_db.json")
+ALIAS_MAP_FILE = os.path.join(CACHE_DIR, "chinese_alias_map.json")
 
-# 内置公司数据库（已知公司，精确匹配）
-COMPANY_DB = {
-    "浪潮": {
-        "en_name": "Inspur",
-        "status": "已列入",
-        "entities": [
-            "Inspur (Beijing) Electronic Information Industry Co., Ltd.",
-            "Inspur Electronic Information Industry Co., Ltd.",
-            "Inspur Electronic Information (Hong Kong) Co., Ltd.",
-            "Inspur (HK) Electronics Co., Ltd.",
-            "Inspur Software Co., Ltd.",
-            "Inspur Taiwan"
-        ],
-        "footnote": "4",
-        "date": "2025年3月25/26日",
-        "reason": "支持中国军事现代化/超级计算机开发",
-        "license_policy": "推定拒绝（需逐案审查，2026年后松动）",
-        "compliance_action": "触发合规审查流程",
-        "source": "Federal Register 2025-05427"
-    },
-    "新华三": {
-        "en_name": "H3C / New H3C",
-        "status": "部分列入",
-        "entities": [
-            "New H3C Semiconductor Technologies Co., Ltd. (新华三半导体技术有限公司)"
-        ],
-        "footnote": "无",
-        "date": "2024年12月",
-        "reason": "获取美国原产物项用于支持中国军事现代化",
-        "license_policy": "推定拒绝",
-        "compliance_action": "触发合规审查流程（子公司已列入）",
-        "source": "BIS December 2024"
-    },
-    "合肥长鑫": {
-        "en_name": "CXMT / ChangXin Memory",
-        "status": "未列入",
-        "entities": [],
-        "footnote": "-",
-        "date": "-",
-        "reason": "-",
-        "license_policy": "正常审批",
-        "compliance_action": "无需触发（未列入）",
-        "source": "待核实"
-    },
-    "中芯国际": {
-        "en_name": "SMIC",
-        "status": "已列入",
-        "entities": [
-            "Semiconductor Manufacturing International Corporation (SMIC)"
-        ],
-        "footnote": "4",
-        "date": "2020年12月",
-        "reason": "与军事最终用户有关联",
-        "license_policy": "推定拒绝（2026年后逐案审查）",
-        "compliance_action": "触发合规审查流程",
-        "source": "BIS"
-    },
-    "长江存储": {
-        "en_name": "YMTC / Yangtze Memory",
-        "status": "已列入",
-        "entities": [
-            "Yangtze Memory Technologies Co., Ltd."
-        ],
-        "footnote": "4",
-        "date": "2022年12月",
-        "reason": "获取先进半导体技术用于军事用途",
-        "license_policy": "推定拒绝",
-        "compliance_action": "触发合规审查流程",
-        "source": "BIS"
-    },
-    "华为": {
-        "en_name": "Huawei",
-        "status": "已列入",
-        "entities": [
-            "Huawei Technologies Co., Ltd.",
-            "Huawei Cloud",
-            " Huawei Device Co., Ltd.",
-            "更多子公司..."
-        ],
-        "footnote": "1, 3, 4",
-        "date": "2019年5月",
-        "reason": "违反美国国家安全/外交政策",
-        "license_policy": "推定拒绝（最严格）",
-        "compliance_action": "强烈建议触发合规审查（列入最早，脚注最多）",
-        "source": "BIS"
-    }
-}
+# 加载 BIS 官方数据库
+def load_official_db():
+    """加载 BIS 官方数据库"""
+    if os.path.exists(OFFICIAL_DB_FILE):
+        with open(OFFICIAL_DB_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+
+def load_alias_map():
+    """加载中文别名映射"""
+    if os.path.exists(ALIAS_MAP_FILE):
+        with open(ALIAS_MAP_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+
+OFFICIAL_DB = load_official_db()
+CHINESE_ALIAS = load_alias_map()
 
 def search_bis_tavily(company_name):
     """使用 Tavily 搜索 BIS 相关信息"""
@@ -124,54 +56,25 @@ def search_bis_tavily(company_name):
     with urllib.request.urlopen(req, timeout=20) as resp:
         return json.loads(resp.read())
 
-def parse_tavily_result(company_name, search_result):
-    """从 Tavily 搜索结果中提取 BIS 信息"""
-    answer = search_result.get("answer", "")
-    results = search_result.get("results", [])
+def judge_compliance(data):
+    """判断是否需要触发合规流程"""
+    status = data.get("status", "")
+    footnote = data.get("footnote", "")
+    policy = data.get("policy", "")
     
-    # 判断是否在清单上
-    status = "未知"
-    entities = []
-    footnote = ""
-    date = ""
-    reason = ""
-    license_policy = ""
-    compliance_action = ""
-    
-    # 简单关键词判断
-    answer_lower = answer.lower()
-    results_text = " ".join([r.get("content", "") for r in results]).lower()
-    
-    if "entity list" in answer_lower or "entity list" in results_text:
-        if "added" in answer_lower or "added" in results_text or "2024" in answer or "2025" in answer or "2026" in answer:
-            status = "已列入"
-        elif "not on" in answer_lower or "not listed" in answer_lower or "removed" in answer_lower:
-            status = "未列入"
-        elif "footnote" in answer_lower:
-            status = "已列入"
-    
-    # 提取脚注
-    for r in results:
-        content = r.get("content", "")
-        if "footnote" in content.lower() and "entity" in content.lower():
-            import re
-            fn_match = re.search(r"Footnote\s*(\d+)", content, re.I)
-            if fn_match:
-                footnote = fn_match.group(1)
-            break
-    
-    return {
-        "company": company_name,
-        "en_name": company_name,
-        "status": status,
-        "entities": entities,
-        "footnote": footnote,
-        "date": date or "待核实",
-        "reason": reason or "请访问 BIS 官网确认",
-        "license_policy": license_policy or "待核实",
-        "compliance_action": compliance_action or "请手动判断",
-        "note": "数据来自 Tavily 搜索，建议访问 BIS 官网核实"
-    }
+    if status == "已列入":
+        if "拒绝" in policy or "denial" in policy.lower():
+            return "⚠️ 拒绝政策，建议强烈触发合规审查"
+        elif "推定拒绝" in policy:
+            return "⚠️ 推定拒绝，建议触发合规审查"
+        else:
+            return "⚠️ 建议触发合规审查"
+    elif status == "部分列入":
+        return "🔶 部分实体已列入，建议触发合规审查"
+    elif status == "未列入":
+        return "✅ 无需触发合规流程"
+    else:
+        return "❓ 请手动判断"
 
 def check_entity(company_name, force_refresh=False):
     """检查公司是否在 BIS 实体清单上"""
@@ -187,78 +90,104 @@ def check_entity(company_name, force_refresh=False):
     
     os.makedirs(CACHE_DIR, exist_ok=True)
     
-    # 优先使用内置数据库
-    if company_name in COMPANY_DB:
-        data = COMPANY_DB[company_name].copy()
-        data['company'] = company_name  # 确保公司名正确显示
-        data['search_time'] = today
-        data['source'] = "内置数据库（精确）"
+    # 优先使用官方数据库
+    result = None
+    
+    # 1. 精确匹配英文名
+    if company_name in OFFICIAL_DB:
+        result = OFFICIAL_DB[company_name].copy()
+        result['company'] = company_name
+        result['source'] = "BIS官方Excel数据（精确匹配）"
+    # 2. 中文别名映射
+    elif company_name in CHINESE_ALIAS:
+        en_name = CHINESE_ALIAS[company_name]
+        if en_name and en_name in OFFICIAL_DB:
+            result = OFFICIAL_DB[en_name].copy()
+            result['company'] = company_name
+            result['source'] = f"BIS官方Excel数据（中文别名映射→{en_name}）"
+        elif en_name is None:
+            # 明确知道不在清单中
+            result = {
+                "company": company_name,
+                "status": "未列入",
+                "en_name": company_name,
+                "footnote": "-",
+                "date": "-",
+                "reason": "明确不在BIS Entity List中",
+                "policy": "正常审批",
+                "search_time": today,
+                "source": "中文别名映射确认"
+            }
+    # 3. 模糊匹配英文名
+    else:
+        for key, value in OFFICIAL_DB.items():
+            if company_name.lower() in key.lower() or key.lower() in company_name.lower():
+                result = value.copy()
+                result['company'] = company_name
+                result['source'] = f"BIS官方Excel数据（模糊匹配→{key}）"
+                break
+    
+    if result:
+        result['search_time'] = today
+        # 确保字段完整
+        result.setdefault('footnote', '-')
+        result.setdefault('date', '-')
+        result.setdefault('reason', '-')
+        result.setdefault('policy', '-')
     else:
         # 动态搜索
         print(f"🔍 数据库未收录，动态查询: {company_name}")
         try:
             search_result = search_bis_tavily(company_name)
-            data = parse_tavily_result(company_name, search_result)
-            data['search_time'] = today
-        except Exception as e:
-            data = {
+            answer = search_result.get("answer", "").lower()
+            
+            if "entity list" in answer and ("added" in answer or "202" in answer):
+                status = "已列入"
+            elif "not on" in answer or "not listed" in answer or "removed" in answer:
+                status = "未列入"
+            else:
+                status = "未知"
+            
+            result = {
                 "company": company_name,
+                "status": status,
                 "en_name": company_name,
+                "footnote": "待核实",
+                "date": "待核实",
+                "reason": "请访问 BIS 官网确认",
+                "policy": "待核实",
+                "search_time": today,
+                "source": "Tavily 搜索"
+            }
+        except Exception as e:
+            result = {
+                "company": company_name,
                 "status": "查询失败",
-                "entities": [],
+                "en_name": company_name,
                 "footnote": "-",
                 "date": "-",
                 "reason": f"查询出错: {str(e)}",
-                "license_policy": "-",
-                "compliance_action": "无法判断，请手动查询",
-                "note": "请访问 BIS 官网手动核实"
+                "policy": "-",
+                "search_time": today,
+                "source": "Tavily 搜索失败"
             }
     
     # 缓存
     with open(cache_file, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+        json.dump(result, f, ensure_ascii=False, indent=2)
     
-    return data
-
-def judge_compliance(data):
-    """判断是否需要触发合规流程"""
-    status = data.get("status", "")
-    footnote = data.get("footnote", "")
-    compliance_action = data.get("compliance_action", "")
-    
-    if status == "已列入":
-        return "⚠️ " + compliance_action
-    elif status == "部分列入":
-        return "🔶 " + compliance_action
-    elif status == "未列入":
-        return "✅ 无需触发合规流程"
-    else:
-        return "❓ 请手动判断"
-    
-def judge_license_policy(data):
-    """判断许可证政策"""
-    footnote = data.get("footnote", "")
-    
-    if footnote in ["1", "3", "4"]:
-        return "推定拒绝（最严格，需充分理由）"
-    elif footnote:
-        return "逐案审查"
-    else:
-        return "正常审批"
+    return result
 
 def format_output(data):
     """格式化输出"""
     company = data.get('company', '')
     en_name = data.get('en_name', '')
     status = data.get('status', '未知')
-    entities = data.get('entities', [])
     footnote = data.get('footnote', '-')
     date = data.get('date', '-')
     reason = data.get('reason', '-')
-    license_policy = data.get('license_policy', '-')
-    compliance_action = data.get('compliance_action', '-')
+    policy = data.get('policy', '-')
     source = data.get('source', '-')
-    note = data.get('note', '')
     
     status_emoji = {
         "已列入": "⚠️",
@@ -280,29 +209,21 @@ def format_output(data):
     print(f"{'='*70}")
     print(f"\n{status_emoji.get(status, '❓')} 状态: **{status_text.get(status, status)}**")
     
-    # 合规建议（醒目展示）
-    if status in ["已列入", "部分列入"]:
-        print(f"\n📌 合规建议: **{judge_compliance(data)}**")
+    # 合规建议
+    print(f"\n📌 合规建议: **{judge_compliance(data)}**")
     
-    # 详细实体信息
-    if entities:
-        print(f"\n📋 具体实体:")
-        for i, e in enumerate(entities, 1):
-            print(f"   {i}. {e}")
-    
-    # 清单信息
+    # 详细信息
     if status in ["已列入", "部分列入"]:
         print(f"\n📋 清单信息:")
-        print(f"   • 清单类型: EL (Entity List)")
-        print(f"   • 脚注: {footnote}")
+        print(f"   • 英文名: {en_name}")
         print(f"   • 列入时间: {date}")
-        print(f"   • 列入原因: {reason}")
-        print(f"   • 许可证政策: {judge_license_policy(data)}")
-        print(f"   • 信息来源: {source}")
+        print(f"   • 许可审查政策: {policy}")
+        if footnote and footnote != '-':
+            print(f"   • 脚注: {footnote}")
+        if reason and reason != '-':
+            print(f"   • 列入原因: {reason}")
     
-    if note:
-        print(f"\n💡 {note}")
-    
+    print(f"\n📊 数据来源: {source}")
     print(f"\n🌐 BIS 官网查询: https://www.bis.gov/")
     print(f"{'='*70}")
     
@@ -314,11 +235,10 @@ def export_for_feishu(data):
         "查询公司": data.get('company', ''),
         "英文名": data.get('en_name', ''),
         "状态": data.get('status', '未知'),
-        "具体实体": "；".join(data.get('entities', [])) or "-",
-        "脚注": data.get('footnote', '-'),
         "列入时间": data.get('date', '-'),
         "列入原因": data.get('reason', '-'),
-        "许可证政策": judge_license_policy(data),
+        "许可证政策": data.get('policy', '-'),
+        "脚注": data.get('footnote', '-'),
         "合规建议": judge_compliance(data),
         "查询时间": data.get('search_time', datetime.now().strftime('%Y-%m-%d')),
         "数据来源": data.get('source', 'Tavily 搜索')
@@ -330,11 +250,12 @@ def main():
     
     if not companies:
         print("用法: python3 check_bis.py <公司名> [--refresh]")
-        print("示例: python3 check_bis.py 浪潮 --refresh")
-        print("内置公司:", list(COMPANY_DB.keys()))
+        print(f"内置数据库: BIS官方Excel（{len(OFFICIAL_DB)}条记录）")
+        print("示例: python3 check_bis.py 华为 --refresh")
         return
     
     print(f"\n🕐 查询时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    print(f"📊 数据库: BIS官方Excel（{len(OFFICIAL_DB)}条记录）")
     
     results = []
     for company in companies:

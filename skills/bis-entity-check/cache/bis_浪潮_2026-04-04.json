@@ -1,0 +1,20 @@
+{
+  "en_name": "Inspur",
+  "status": "已列入",
+  "entities": [
+    "Inspur (Beijing) Electronic Information Industry Co., Ltd.",
+    "Inspur Electronic Information Industry Co., Ltd.",
+    "Inspur Electronic Information (Hong Kong) Co., Ltd.",
+    "Inspur (HK) Electronics Co., Ltd.",
+    "Inspur Software Co., Ltd.",
+    "Inspur Taiwan"
+  ],
+  "footnote": "4",
+  "date": "2025年3月25/26日",
+  "reason": "支持中国军事现代化/超级计算机开发",
+  "license_policy": "推定拒绝（需逐案审查，2026年后松动）",
+  "compliance_action": "触发合规审查流程",
+  "source": "内置数据库（精确）",
+  "company": "浪潮",
+  "search_time": "2026-04-04"
+}
