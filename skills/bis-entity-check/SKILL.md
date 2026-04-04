@@ -16,12 +16,29 @@ description: |
 
 # BIS Entity Check - BIS 实体清单查询
 
+## ⚙️ 数据源配置
+
+内置数据库使用 BIS 官方 Excel 数据（**1069 家中国实体，2760 条记录**）：
+
+| 配置项 | 值 |
+|--------|---|
+| **主数据文件** | `~/.openclaw/workspace/skills/bis-entity-check/cache/bis_china_official_db.json` |
+| **中文别名映射** | `~/.openclaw/workspace/skills/bis-entity-check/cache/chinese_alias_map.json` |
+| **内置数据库规模** | 2760 条（英文名+别名→实体信息） |
+| **覆盖实体数** | 1069 家中国实体 |
+| **数据来源** | BIS 官方 Excel（BIS_Entity_List_China_latest.xlsx） |
+| **数据更新日期** | 2026-04-04 |
+
+> 📌 当 BIS 官网更新 Excel 时，将新 Excel 放到上述路径，重新运行 `rebuild_db.py` 即可更新内置数据库。
+
 ## 核心功能
 
 | 功能 | 说明 |
 |------|------|
-| **动态查询** | 支持任意公司名称，不限于内置数据库 |
-| **完整信息** | 列入状态 + 时间 + 原因 + 脚注 + 子公司关系 |
+| **内置数据库查询** | 基于 BIS 官方 Excel，精确匹配中英文公司名 |
+| **中文别名映射** | 支持中文公司名直接查询（宇视、海康威视、大华等） |
+| **动态联网查询** | 未收录公司自动调用 Tavily 搜索 BIS 最新信息 |
+| **完整信息** | 列入状态 + 时间 + 原因 + 脚注 + 许可政策 |
 | **合规判断** | 自动判断是否需要触发合规审查流程 |
 | **飞书记录** | 查询结果自动写入飞书 Bitable 备查追溯 |
 
@@ -65,16 +82,23 @@ description: |
 
 ## 内置公司数据库
 
-以下公司有精确信息（无需联网）：
+内置数据库收录 **1069 家中国实体**，覆盖以下常见公司：
 
 | 公司 | 状态 | 列入时间 | 脚注 |
 |------|------|---------|------|
-| 华为 | ⚠️ 已列入 | 2019年5月 | 1, 3, 4 |
-| 中芯国际 | ⚠️ 已列入 | 2020年12月 | 4 |
-| 长江存储 | ⚠️ 已列入 | 2022年12月 | 4 |
-| 新华三 | 🔶 部分列入 | 2024年12月 | - |
-| 浪潮 | ⚠️ 已列入 | 2025年3月 | 4 |
-| 合肥长鑫 | ✅ 未列入 | - | - |
+| 华为（含关联公司） | ⚠️ 已列入 | 2019年5月 | 1, 3, 4 |
+| 中芯国际（SMIC） | ⚠️ 已列入 | 2020年12月 | 4 |
+| 长江存储（YMTC） | ⚠️ 已列入 | 2022年12月 | - |
+| 海康威视 | ⚠️ 已列入 | 2019年10月 | - |
+| 大华 | ⚠️ 已列入 | 2020年8月 | - |
+| 宇视 | ⚠️ 已列入 | 2024年12月 | - |
+| 浪潮（Inspur） | ⚠️ 已列入 | 2025年3月 | 4 |
+| 宁畅（Nettrix） | ⚠️ 已列入 | 2025年3月 | 4 |
+| 中兴（Space Star） | ⚠️ 已列入 | 2025年3月 | - |
+| 超聚变（xFusion） | ✅ 未列入 | - | - |
+| 合肥长鑫（CXMT） | ✅ 未列入 | - | - |
+
+> 📌 以上为精选示例；完整数据库包含 1069 家实体，支持任意中英文名称查询。
 
 ## 飞书记录
 
@@ -105,23 +129,31 @@ description: |
 
 ```bash
 # 查询公司（支持任意名称）
-python3 skills/bis-entity-check/scripts/check_bis.py 华为
+python3 skills/bis-entity-check/scripts/check_bis.py 宇视
 
 # 强制刷新缓存
-python3 skills/bis-entity-check/scripts/check_bis.py 华为 --refresh
+python3 skills/bis-entity-check/scripts/check_bis.py 宇视 --refresh
 
 # 查询多个公司
-python3 skills/bis-entity-check/scripts/check_bis.py 华为 中芯国际 浪潮
+python3 skills/bis-entity-check/scripts/check_bis.py 宇视 海康威视 大华
+
+# ========== 数据库更新 ==========
+# 当 BIS 官网更新 Excel 时，下载新版本后运行：
+python3 skills/bis-entity-check/scripts/rebuild_db.py <Excel文件路径>
+
+# 示例：
+python3 skills/bis-entity-check/scripts/rebuild_db.py ~/Downloads/BIS_Entity_List_China_latest.xlsx
 ```
 
 ## 数据来源
 
 | 来源 | 说明 |
 |------|------|
-| 内置数据库 | 精确信息（华为、中芯国际等6家公司） |
-| Tavily 搜索 | 动态查询未收录的公司（实时搜索 BIS 官网） |
+| **BIS 官方 Excel** | 优先查询：1069 家中国实体，精确匹配中英文 |
+| **中文别名映射** | 26 个常见中文公司名 → 英文名 → BIS 数据 |
+| **Tavily 搜索** | 未收录公司自动联网查询 BIS 最新信息 |
 
-> ⚠️ 数据来源说明：内置数据库来自 BIS 官方 Federal Register 公开文件；动态查询来自 Tavily 搜索结果，非 BIS 官方文档。如需权威信息请访问 https://www.bis.gov/
+> ⚠️ BIS 官方 Excel 数据覆盖中国实体主表（1069条）+ 关联表（36条）；动态查询用于补充未收录实体。数据如有差异请以 https://www.bis.gov/ 官方公告为准。
 
 ## 知识库
 
