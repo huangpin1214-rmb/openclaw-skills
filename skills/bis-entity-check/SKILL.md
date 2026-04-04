@@ -145,6 +145,23 @@ python3 skills/bis-entity-check/scripts/rebuild_db.py <Excel文件路径>
 python3 skills/bis-entity-check/scripts/rebuild_db.py ~/Downloads/BIS_Entity_List_China_latest.xlsx
 ```
 
+## 数据库自动更新
+
+**触发方式**：把 BIS 新版 Excel 发到飞书群/私信给我即可自动更新。
+
+**自动执行**：
+1. 收到文件 → 检测文件名含 `bis`/`entity`/`china` 等关键词
+2. 自动运行 `rebuild_db.py` 解析 Excel
+3. 重建内置数据库
+4. 回复更新结果
+
+**手动更新**：
+```bash
+# 把 Excel 发给阿鲲 并说"更新 BIS 内置数据库"
+# 或手动运行：
+rebuild_db.py <Excel路径>
+```
+
 ## 数据来源
 
 | 来源 | 说明 |
