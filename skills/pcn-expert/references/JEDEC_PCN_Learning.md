@@ -1,8 +1,11 @@
 # JEDEC PCN 规范学习摘要
 
-> 学习时间: 2026-03-23
-> 资料来源: JEDEC可靠性标准学习报告.md（第24-27节）
-> ⚠️ 本文档为学习摘要，非JEDEC官方原文。如需权威定义请参考JEDEC官方文档。
+> 学习时间: 2026-04-05
+> 资料来源: 
+> - JEDEC可靠性标准学习报告.md（第24-27节）
+> - 主流芯片厂商PCN调研报告.pdf（飞书文件夹）
+> - 厂商实际PCN案例（TI/Intel/NXP/NVIDIA）
+> ⚠️ 本文档为学习摘要+实际案例，非JEDEC官方原文。
 
 ---
 
@@ -91,7 +94,83 @@ PCN必须包含：
 
 ---
 
-## 五、常见PCN触发条件速查
+## 五、主流厂商PCN实际格式（学习自TI/Intel/NXP/NVIDIA）
+
+### 5.1 PCN标准结构
+
+```
+1. 头部信息
+   - 公司名称+地址
+   - PCN编号（如：PCN# 20250213002.1）
+   - 标题（变更描述）
+   - 日期
+   - 收件人
+
+2. 变更通知类型
+   - Change Notification / Sample Request（需确认）
+   - Information Only（仅通知，无需回复）
+
+3. 客户须知
+   - 确认期限（如：60天内）
+   - 默认接受条款（如：30/60天无回复视为接受）
+   - 样品申请说明
+
+4. 关键里程碑
+   - Proposed 1st Ship Date（首次发货日期）
+   - Sample Request Date（样品申请截止）
+
+5. 变更类型（打勾选择）
+   □ Assembly Site    □ Design       □ Wafer Bump Material
+   □ Assembly Process □ Data Sheet    □ Wafer Bump Process
+   □ Assembly Materials □ Part number change □ Wafer Fab Site
+   □ Mechanical Specification □ Test Site □ Wafer Fab Materials
+   □ Packing/Shipping/Labeling □ Test Process □ Wafer Fab Process
+
+6. 变更详细描述
+   - Current XX → New XX（表格对比）
+   - Qual details provided in Qual Data Section
+
+7. 变更原因
+   - 如：Continuity of Supply / Cost Reduction / Quality Improvement
+
+8. 影响评估
+   - Anticipated impact on Form, Fit, Function, Quality, Reliability
+   - Positive / Negative / None
+
+9. 产品标识变更说明
+   - 如：Changes to product identification resulting from this PCN
+
+10. 受影响产品完整清单
+    - DEVICE | CUSTOMER PART NUMBER 表格
+```
+
+### 5.2 厂商差异总结
+
+| 差异点 | TI | Intel | Infineon/Broadcom |
+|--------|-----|-------|-------------------|
+| 通知性质 | Information Only + 需确认两类 | Minor/Major分类 | 通常需确认 |
+| 默认期限 | 60天 | 30天 | 30天 |
+| 供应商披露 | 不披露具体供应商名 | 不披露具体供应商名 | 不披露 |
+| 影响说明 | 简洁"None" | 简洁"无影响" | 逐条详细说明 |
+| Minor vs Major | 不显式标注 | 标题冠以"MINOR CHANGE" | 标注"Major" |
+
+### 5.3 Intel PCN Minor变更示例
+
+> "Intel considers this a MINOR CHANGE. There is no change to the form, fit, functionality, quality or reliability for any of the downstream products."
+
+### 5.4 厂商PCN案例文件
+
+| 文件 | 说明 |
+|------|------|
+| `TI_PCN20250213002.pdf` | TI Die Coat材料变更PCN（2025年2月） |
+| `Intel_PCN119527.pdf` | Intel电阻供应商变更PCN（Minor） |
+| `NXP_Final_PCN.pdf` | NXP产品变更PCN |
+| `NVIDIA_Jetson_TX1_TX2_PCN.pdf` | NVIDIA Jetson模块PCN |
+| `PCN常见问题FAQ.docx` | PCN常见问题FAQ |
+
+---
+
+## 六、常见PCN触发条件速查
 
 | 场景 | 是否需要发PCN | 依据 |
 |------|-------------|------|
@@ -105,4 +184,4 @@ PCN必须包含：
 
 ---
 
-*本文档为学习摘要，完整规范请参考JEDEC官方原文*
+*本文档为学习摘要+实际案例，完整规范请参考JEDEC官方原文*
